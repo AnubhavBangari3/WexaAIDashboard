@@ -1,0 +1,76 @@
+# =========================================================
+# PYTHON / DJANGO
+# =========================================================
+
+env/
+venv/
+.venv/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+db.sqlite3
+
+media/
+staticfiles/
+
+# Environment Variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Django
+*.sqlite3
+
+# =========================================================
+# NODE / NEXT.JS
+# =========================================================
+
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Package Managers
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+
+# Coverage
+frontend/coverage/
+
+# Debug Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# Vercel
+frontend/.vercel
+
+# Typescript
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# =========================================================
+# IDE / OS FILES
+# =========================================================
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =========================================================
+# MISC
+# =========================================================
+
+*.pem
