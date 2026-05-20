@@ -1,0 +1,4 @@
+event_name,user_id,page,amount
+page_view,101,/home,
+purchase,102,/pricing,499
+signup,103,/signup,
