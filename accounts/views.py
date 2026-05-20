@@ -52,7 +52,15 @@ class InviteUserView(APIView):
             context={"request": request},
         )
 
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "detail": "Invite validation failed.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         invited_user = serializer.save()
 
         return Response(
@@ -68,5 +76,8 @@ class OrganizationUsersView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        users = User.objects.filter(organization=request.user.organization)
+        users = User.objects.filter(
+            organization=request.user.organization
+        ).order_by("id")
+
         return Response(UserSerializer(users, many=True).data)
