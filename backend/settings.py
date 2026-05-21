@@ -151,11 +151,23 @@ SIMPLE_JWT = {
 }
 
 
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_BROKER_URL = "sqla+sqlite:///celery_broker.sqlite"
+CELERY_RESULT_BACKEND = "db+sqlite:///celery_results.sqlite"
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
-CELERY_TASK_ALWAYS_EAGER = True
+
+CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_BEAT_SCHEDULE = {
+    "evaluate-alerts-every-60-seconds": {
+        "task": "alerts.tasks.evaluate_alerts_task",
+        "schedule": 60.0,
+    },
+}
+
+DEFAULT_FROM_EMAIL = "alerts@wexa.local"
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
