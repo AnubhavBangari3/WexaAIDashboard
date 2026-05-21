@@ -74,3 +74,14 @@ Thumbs.db
 # =========================================================
 
 *.pem
+
+# Celery Runtime Files
+celery_broker.sqlite
+celery_results.sqlite
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+
+# SQLite
+*.sqlite
+*.sqlite3
