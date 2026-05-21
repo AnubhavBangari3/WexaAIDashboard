@@ -9,4 +9,5 @@ urlpatterns = [
     path("api/ingestion/", include("ingestion.urls")),
     path("api/dashboards/", include("dashboards.urls")),
     path("api/alerts/", include("alerts.urls")),
+    path("api/reports/", include("reports.urls")),
 ]

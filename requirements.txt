@@ -27,6 +27,7 @@ kombu==5.6.2
 numpy==2.4.6
 packaging==26.2
 pandas==3.0.3
+pillow==12.2.0
 pluggy==1.6.0
 prompt_toolkit==3.0.52
 psycopg2-binary==2.9.12
@@ -40,6 +41,7 @@ python-crontab==3.3.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 redis==7.4.0
+reportlab==4.5.1
 requests==2.34.2
 six==1.17.0
 SQLAlchemy==2.0.49

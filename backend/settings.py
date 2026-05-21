@@ -171,3 +171,17 @@ CELERY_BEAT_SCHEDULE = {
 
 DEFAULT_FROM_EMAIL = "alerts@wexa.local"
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+CELERY_BEAT_SCHEDULE = {
+    "evaluate-alerts-every-60-seconds": {
+        "task": "alerts.tasks.evaluate_alerts_task",
+        "schedule": 60.0,
+    },
+    "process-due-scheduled-reports-every-60-seconds": {
+        "task": "reports.tasks.process_due_scheduled_reports_task",
+        "schedule": 60.0,
+    },
+}
