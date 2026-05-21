@@ -1,4 +1,5 @@
 import csv
+from django.core.cache import cache
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import status, permissions
@@ -18,10 +19,120 @@ from .serializers import (
 from .tasks import process_event_task
 
 
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+AUTH_USER_RATE_LIMIT = 120
+API_KEY_RATE_LIMIT = 300
+CSV_UPLOAD_RATE_LIMIT = 20
+
+
 def get_user_organization(user):
-    if not user.is_authenticated or not user.organization:
+    if not user.is_authenticated or not getattr(user, "organization", None):
         return None
     return user.organization
+
+
+def get_client_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def check_rate_limit(key, limit, window_seconds=RATE_LIMIT_WINDOW_SECONDS):
+    """
+    Redis-backed fixed-window rate limiter.
+    Uses Django cache, which is configured to Redis in settings.py.
+    """
+    current_count = cache.get(key)
+
+    if current_count is None:
+        cache.set(key, 1, timeout=window_seconds)
+        return True, limit - 1
+
+    if int(current_count) >= limit:
+        return False, 0
+
+    try:
+        new_count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=window_seconds)
+        new_count = 1
+
+    remaining = max(limit - int(new_count), 0)
+    return True, remaining
+
+
+def enforce_authenticated_rate_limit(request, organization, action="ingestion"):
+    user_id = getattr(request.user, "id", "anonymous")
+    org_id = organization.id
+    ip = get_client_ip(request)
+
+    key = f"rate_limit:auth:{action}:org:{org_id}:user:{user_id}:ip:{ip}"
+
+    allowed, remaining = check_rate_limit(
+        key=key,
+        limit=AUTH_USER_RATE_LIMIT,
+    )
+
+    if not allowed:
+        return Response(
+            {
+                "detail": "Rate limit exceeded. Please try again later.",
+                "limit": AUTH_USER_RATE_LIMIT,
+                "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            },
+            status=429,
+        )
+
+    return None
+
+
+def enforce_api_key_rate_limit(request, api_key, action="webhook"):
+    ip = get_client_ip(request)
+
+    key = f"rate_limit:api_key:{action}:org:{api_key.organization_id}:key:{api_key.id}:ip:{ip}"
+
+    allowed, remaining = check_rate_limit(
+        key=key,
+        limit=API_KEY_RATE_LIMIT,
+    )
+
+    if not allowed:
+        return Response(
+            {
+                "detail": "API key rate limit exceeded. Please try again later.",
+                "limit": API_KEY_RATE_LIMIT,
+                "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            },
+            status=429,
+        )
+
+    return None
+
+
+def enforce_csv_rate_limit(request, organization):
+    user_id = getattr(request.user, "id", "anonymous")
+    org_id = organization.id
+
+    key = f"rate_limit:csv_upload:org:{org_id}:user:{user_id}"
+
+    allowed, remaining = check_rate_limit(
+        key=key,
+        limit=CSV_UPLOAD_RATE_LIMIT,
+    )
+
+    if not allowed:
+        return Response(
+            {
+                "detail": "CSV upload rate limit exceeded. Please try again later.",
+                "limit": CSV_UPLOAD_RATE_LIMIT,
+                "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            },
+            status=429,
+        )
+
+    return None
 
 
 def broadcast_ingestion_event(event):
@@ -35,7 +146,9 @@ def broadcast_ingestion_event(event):
                 "payload": event.payload,
                 "source_type": event.source_type,
                 "occurred_at": event.occurred_at.isoformat() if event.occurred_at else None,
-                "created_at": event.created_at.isoformat() if hasattr(event, "created_at") and event.created_at else None,
+                "created_at": event.created_at.isoformat()
+                if hasattr(event, "created_at") and event.created_at
+                else None,
             },
         )
     except Exception as exc:
@@ -99,6 +212,14 @@ class EventIngestView(APIView):
         if not organization:
             return Response({"detail": "User has no organization."}, status=400)
 
+        rate_limit_response = enforce_authenticated_rate_limit(
+            request=request,
+            organization=organization,
+            action="single_event",
+        )
+        if rate_limit_response:
+            return rate_limit_response
+
         serializer = EventIngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -125,6 +246,14 @@ class BatchEventIngestView(APIView):
         organization = get_user_organization(request.user)
         if not organization:
             return Response({"detail": "User has no organization."}, status=400)
+
+        rate_limit_response = enforce_authenticated_rate_limit(
+            request=request,
+            organization=organization,
+            action="batch_event",
+        )
+        if rate_limit_response:
+            return rate_limit_response
 
         serializer = BatchEventIngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -160,6 +289,13 @@ class CSVUploadView(APIView):
         organization = get_user_organization(request.user)
         if not organization:
             return Response({"detail": "User has no organization."}, status=400)
+
+        rate_limit_response = enforce_csv_rate_limit(
+            request=request,
+            organization=organization,
+        )
+        if rate_limit_response:
+            return rate_limit_response
 
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
@@ -237,6 +373,14 @@ class WebhookIngestView(APIView):
             return Response({"detail": "X-API-Key header is required."}, status=401)
 
         api_key = get_object_or_404(APIKey, key=api_key_value, is_active=True)
+
+        rate_limit_response = enforce_api_key_rate_limit(
+            request=request,
+            api_key=api_key,
+            action="webhook_event",
+        )
+        if rate_limit_response:
+            return rate_limit_response
 
         serializer = EventIngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
