@@ -1,6 +1,18 @@
 from celery import shared_task
-from .models import AlertRule
+
+from backend.realtime import broadcast_alert
+
+from .models import AlertRule, Notification
 from .services import evaluate_all_alerts, evaluate_alert_rule
+
+
+def broadcast_new_notifications(before_ids):
+    notifications = Notification.objects.exclude(
+        id__in=before_ids
+    ).select_related("organization", "alert_rule")
+
+    for notification in notifications:
+        broadcast_alert(notification)
 
 
 @shared_task(
@@ -10,7 +22,13 @@ from .services import evaluate_all_alerts, evaluate_alert_rule
     retry_kwargs={"max_retries": 3},
 )
 def evaluate_alerts_task(self):
-    return evaluate_all_alerts()
+    before_ids = set(Notification.objects.values_list("id", flat=True))
+
+    result = evaluate_all_alerts()
+
+    broadcast_new_notifications(before_ids)
+
+    return result
 
 
 @shared_task(
@@ -20,5 +38,11 @@ def evaluate_alerts_task(self):
     retry_kwargs={"max_retries": 3},
 )
 def evaluate_single_alert_task(self, alert_id):
+    before_ids = set(Notification.objects.values_list("id", flat=True))
+
     alert = AlertRule.objects.get(id=alert_id)
-    return evaluate_alert_rule(alert)
+    result = evaluate_alert_rule(alert)
+
+    broadcast_new_notifications(before_ids)
+
+    return result
