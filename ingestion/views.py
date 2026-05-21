@@ -5,6 +5,8 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from backend.realtime import broadcast_event
+
 from .models import APIKey, Event, CSVUpload
 from .serializers import (
     APIKeySerializer,
@@ -20,6 +22,24 @@ def get_user_organization(user):
     if not user.is_authenticated or not user.organization:
         return None
     return user.organization
+
+
+def broadcast_ingestion_event(event):
+    try:
+        broadcast_event(
+            organization_id=event.organization_id,
+            event_type="event.created",
+            payload={
+                "id": event.id,
+                "event_name": event.event_name,
+                "payload": event.payload,
+                "source_type": event.source_type,
+                "occurred_at": event.occurred_at.isoformat() if event.occurred_at else None,
+                "created_at": event.created_at.isoformat() if hasattr(event, "created_at") and event.created_at else None,
+            },
+        )
+    except Exception as exc:
+        print("Realtime broadcast failed:", exc)
 
 
 class APIKeyListCreateView(APIView):
@@ -93,6 +113,7 @@ class EventIngestView(APIView):
         )
 
         process_event_task.delay(event.id)
+        broadcast_ingestion_event(event)
 
         return Response(EventResponseSerializer(event).data, status=201)
 
@@ -118,8 +139,10 @@ class BatchEventIngestView(APIView):
                 source_type=Event.SOURCE_BATCH,
                 occurred_at=item.get("occurred_at") or timezone.now(),
             )
+
             created_events.append(event)
             process_event_task.delay(event.id)
+            broadcast_ingestion_event(event)
 
         return Response(
             {
@@ -173,7 +196,9 @@ class CSVUploadView(APIView):
 
                     created_events.append(event)
                     successful_rows += 1
+
                     process_event_task.delay(event.id)
+                    broadcast_ingestion_event(event)
 
                 except Exception:
                     failed_rows += 1
@@ -201,6 +226,7 @@ class CSVUploadView(APIView):
                 status=400,
             )
 
+
 class WebhookIngestView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -227,6 +253,7 @@ class WebhookIngestView(APIView):
         )
 
         process_event_task.delay(event.id)
+        broadcast_ingestion_event(event)
 
         return Response(EventResponseSerializer(event).data, status=201)
 
@@ -239,5 +266,5 @@ class EventListView(APIView):
         if not organization:
             return Response({"detail": "User has no organization."}, status=400)
 
-        events = Event.objects.filter(organization=organization)[:100]
+        events = Event.objects.filter(organization=organization).order_by("-occurred_at")[:100]
         return Response(EventResponseSerializer(events, many=True).data)

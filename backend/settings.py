@@ -31,6 +31,8 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -84,6 +86,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = 'backend.asgi.application'
 
 
 # Database
@@ -183,5 +186,19 @@ CELERY_BEAT_SCHEDULE = {
     "process-due-scheduled-reports-every-60-seconds": {
         "task": "reports.tasks.process_due_scheduled_reports_task",
         "schedule": 60.0,
+    },
+}
+
+# Django Channels / WebSocket
+# For Celery-to-WebSocket push, install/run Redis and channels_redis.
+# Local fallback works for runserver-only broadcasts.
+CHANNEL_LAYER_BACKEND = "channels_redis.core.RedisChannelLayer"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": CHANNEL_LAYER_BACKEND,
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
     },
 }
