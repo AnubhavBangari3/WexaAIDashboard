@@ -55,6 +55,7 @@ frontend/.pnpm-debug.log*
 
 # Vercel
 frontend/.vercel
+frontend/.gitignore
 
 # Typescript
 frontend/*.tsbuildinfo
