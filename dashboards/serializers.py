@@ -37,8 +37,13 @@ class WidgetSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
 
+        read_only_fields = [
+            "id",
+            "dashboard",
+            "created_at",
+            "updated_at",
+        ]
 
 class DashboardSerializer(serializers.ModelSerializer):
     widgets = WidgetSerializer(many=True, read_only=True)
