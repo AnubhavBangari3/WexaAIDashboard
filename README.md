@@ -237,13 +237,17 @@ CELERY_RESULT_BACKEND=redis://127.0.0.1:6379
 
 ## Start Redis
 
+# Run Backend
+
+## Start Redis (Docker)
+
 ```bash
-redis-server
+docker run --name redis-wexa -p 6379:6379 redis
 ```
 
 ---
 
-## Start Django
+## Start Django Server
 
 ```bash
 python manage.py runserver
@@ -256,7 +260,7 @@ python manage.py runserver
 ### Windows
 
 ```bash
-celery -A backend worker -l info -P solo
+celery -A backend worker -l info --pool=solo
 ```
 
 ### Linux / Mac
@@ -267,7 +271,7 @@ celery -A backend worker -l info
 
 ---
 
-## Start Celery Beat
+## Start Celery Beat Scheduler
 
 ```bash
 celery -A backend beat -l info
